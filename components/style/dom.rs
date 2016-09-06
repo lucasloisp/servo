@@ -11,6 +11,7 @@ use element_state::ElementState;
 use parking_lot::RwLock;
 use properties::{ComputedValues, PropertyDeclarationBlock};
 use restyle_hints::{RESTYLE_DESCENDANTS, RESTYLE_LATER_SIBLINGS, RESTYLE_SELF, RestyleHint};
+use rule_tree::StrongRuleNode;
 use selector_impl::{ElementExt, PseudoElement};
 use selector_matching::ApplicableDeclarationBlock;
 use sink::Push;
@@ -154,8 +155,10 @@ pub trait TNode : Sized + Copy + Clone + NodeInfo {
     /// complexity.
     fn get_existing_style(&self) -> Option<Arc<ComputedValues>>;
 
+    fn get_existing_style_and_rule_node(&self) -> Option<(Arc<ComputedValues>, StrongRuleNode)>;
+
     /// Sets the computed style for this node.
-    fn set_style(&self, style: Option<Arc<ComputedValues>>);
+    fn set_style(&self, style: Option<(Arc<ComputedValues>, StrongRuleNode)>);
 
     /// Transfers ownership of the existing pseudo styles, if any, to the
     /// caller. The stored pseudo styles are replaced with an empty map.

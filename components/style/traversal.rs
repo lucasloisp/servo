@@ -273,7 +273,7 @@ fn ensure_node_styled_internal<'a, N, C>(node: N,
     }
 
     unsafe {
-        node.cascade_node(context, parent, &applicable_declarations);
+        node.cascade_node(context, parent, applicable_declarations);
     }
 }
 
@@ -359,7 +359,7 @@ pub fn recalc_style_at<'a, N, C>(context: &'a C,
                 unsafe {
                     restyle_result = node.cascade_node(context,
                                                        parent_opt,
-                                                       &applicable_declarations);
+                                                       applicable_declarations);
                 }
 
                 // Add ourselves to the LRU cache.
@@ -378,14 +378,15 @@ pub fn recalc_style_at<'a, N, C>(context: &'a C,
         }
     } else {
         // Finish any expired transitions.
-        let mut existing_style = node.get_existing_style().unwrap();
+        let (mut existing_style, rule_node) =
+            node.get_existing_style_and_rule_node().unwrap();
         let had_animations_to_expire = animation::complete_expired_transitions(
             node.opaque(),
             &mut existing_style,
             context.shared_context()
         );
         if had_animations_to_expire {
-            node.set_style(Some(existing_style));
+            node.set_style(Some((existing_style, rule_node)));
         }
     }
 
