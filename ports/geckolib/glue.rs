@@ -42,9 +42,8 @@ use style::parallel;
 use style::parser::{ParserContext, ParserContextExtraData};
 use style::properties::{ComputedValues, Importance, PropertyDeclaration};
 use style::properties::{PropertyDeclarationParseResult, PropertyDeclarationBlock};
-use style::properties::{cascade, parse_one_declaration};
+use style::properties::{apply_declarations, parse_one_declaration};
 use style::selector_impl::PseudoElementCascadeType;
-use style::selector_matching::ApplicableDeclarationBlock;
 use style::sequential;
 use style::string_cache::Atom;
 use style::stylesheets::{Origin, Stylesheet};
@@ -131,24 +130,23 @@ pub extern "C" fn Servo_RestyleWithAddedDeclaration(declarations: ServoDeclarati
                                                     previous_style: ServoComputedValuesBorrowed)
   -> ServoComputedValuesStrong
 {
+    use style::declarations_iterators::RawDeclarationsIterator;
+
     match GeckoDeclarationBlock::as_arc(&declarations).declarations {
         Some(ref declarations) => {
-            let declaration_block = ApplicableDeclarationBlock {
-                mixed_declarations: declarations.clone(),
-                importance: Importance::Normal,
-                source_order: 0,
-                specificity: ::std::u32::MAX,
-            };
             let previous_style = ComputedValues::as_arc(&previous_style);
+            let guard = declarations.read();
+
+            let declarations =
+                RawDeclarationsIterator::new(&guard.declarations);
 
             // FIXME (bug 1303229): Use the actual viewport size here
-            let (computed, _) = cascade(Size2D::new(Au(0), Au(0)),
-                                        &[declaration_block],
-                                        false,
-                                        Some(previous_style),
-                                        None,
-                                        None,
-                                        Box::new(StdoutErrorReporter));
+            let computed = apply_declarations(Size2D::new(Au(0), Au(0)),
+                                              /* is_root_element = */ false,
+                                              declarations,
+                                              /* shareable = */ false,
+                                              previous_style, None,
+                                              Box::new(StdoutErrorReporter));
             Arc::new(computed).into_strong()
         },
         None => ServoComputedValuesStrong::null(),
@@ -168,14 +166,14 @@ pub extern "C" fn Servo_Node_ClearNodeData(node: RawGeckoNodeBorrowed) -> () {
 
 #[no_mangle]
 pub extern "C" fn Servo_StyleSheet_FromUTF8Bytes(bytes: *const u8,
-                                                length: u32,
-                                                mode: SheetParsingMode,
-                                                base_bytes: *const u8,
-                                                base_length: u32,
-                                                base: *mut ThreadSafeURIHolder,
-                                                referrer: *mut ThreadSafeURIHolder,
-                                                principal: *mut ThreadSafePrincipalHolder)
-                                                -> RawServoStyleSheetStrong {
+                                                 length: u32,
+                                                 mode: SheetParsingMode,
+                                                 base_bytes: *const u8,
+                                                 base_length: u32,
+                                                 base: *mut ThreadSafeURIHolder,
+                                                 referrer: *mut ThreadSafeURIHolder,
+                                                 principal: *mut ThreadSafePrincipalHolder)
+                                                 -> RawServoStyleSheetStrong {
     let input = unsafe { from_utf8_unchecked(slice::from_raw_parts(bytes, length as usize)) };
 
     let origin = match mode {
@@ -287,7 +285,8 @@ pub extern "C" fn Servo_ComputedValues_GetForAnonymousBox(parent_style_or_null: 
 
 
     let maybe_parent = ComputedValues::arc_from_borrowed(&parent_style_or_null);
-    let new_computed = data.stylist.precomputed_values_for_pseudo(&pseudo, maybe_parent);
+    let new_computed = data.stylist.precomputed_values_for_pseudo(&pseudo, maybe_parent)
+                           .map(|(computed, _rule_node)| computed);
     new_computed.map_or(Strong::null(), |c| c.into_strong())
 }
 
@@ -328,6 +327,7 @@ pub extern "C" fn Servo_ComputedValues_GetForPseudoElement(parent_style: ServoCo
             let parent = ComputedValues::as_arc(&parent_style);
             data.stylist
                 .lazily_compute_pseudo_element_style(&element, &pseudo, parent)
+                .map(|(c, _rule_node)| c)
                 .map_or_else(parent_or_null, FFIArcHelpers::into_strong)
         }
         PseudoElementCascadeType::Precomputed => {

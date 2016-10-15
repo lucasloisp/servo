@@ -5,16 +5,18 @@
 //! Per-node data used in style calculation.
 
 use properties::ComputedValues;
+use rule_tree::StrongRuleNode;
 use selector_impl::PseudoElement;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
 
-pub type PseudoStyles = HashMap<PseudoElement, Arc<ComputedValues>,
+pub type PseudoStyles = HashMap<PseudoElement, (Arc<ComputedValues>, StrongRuleNode),
                                 BuildHasherDefault<::fnv::FnvHasher>>;
 pub struct PersistentStyleData {
-    /// The results of CSS styling for this node.
-    pub style: Option<Arc<ComputedValues>>,
+    /// The results of CSS styling for this node, along with the rule node
+    /// associated with this node.
+    pub style: Option<(Arc<ComputedValues>, StrongRuleNode)>,
 
     /// The results of CSS styling for each pseudo-element (if any).
     pub per_pseudo: PseudoStyles,

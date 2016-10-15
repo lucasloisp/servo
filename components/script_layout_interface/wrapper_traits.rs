@@ -243,7 +243,7 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
         match self.get_pseudo_element_type() {
             PseudoElementType::Normal => {
                 self.get_style_data().unwrap().borrow()
-                    .style.as_ref().unwrap().clone()
+                    .style.as_ref().unwrap().0.clone()
             },
             other => {
                 // Precompute non-eagerly-cascaded pseudo-element styles if not
@@ -258,12 +258,12 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
                                 .borrow()
                                 .per_pseudo.contains_key(&style_pseudo) {
                             let mut data = self.get_style_data().unwrap().borrow_mut();
-                            let new_style =
+                            let new_style_and_rule_node =
                                 context.stylist
                                        .precomputed_values_for_pseudo(&style_pseudo,
-                                                                      data.style.as_ref());
+                                                                      data.style.as_ref().map(|s| &s.0));
                             data.per_pseudo
-                                .insert(style_pseudo.clone(), new_style.unwrap());
+                                .insert(style_pseudo.clone(), new_style_and_rule_node.unwrap());
                         }
                     }
                     PseudoElementCascadeType::Lazy => {
@@ -278,7 +278,7 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
                                        .lazily_compute_pseudo_element_style(
                                            &self.as_element(),
                                            &style_pseudo,
-                                           data.style.as_ref().unwrap());
+                                           &data.style.as_ref().unwrap().0);
                             data.per_pseudo
                                 .insert(style_pseudo.clone(), new_style.unwrap());
                         }
@@ -287,7 +287,7 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
 
                 self.get_style_data().unwrap().borrow()
                     .per_pseudo.get(&style_pseudo)
-                    .unwrap().clone()
+                    .unwrap().0.clone()
             }
         }
     }
@@ -304,9 +304,9 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
         let data = self.get_style_data().unwrap().borrow();
         match self.get_pseudo_element_type() {
             PseudoElementType::Normal
-                => data.style.as_ref().unwrap().clone(),
+                => data.style.as_ref().unwrap().0.clone(),
             other
-                => data.per_pseudo.get(&other.style_pseudo_element()).unwrap().clone(),
+                => data.per_pseudo.get(&other.style_pseudo_element()).unwrap().0.clone(),
         }
     }
 
@@ -315,7 +315,7 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + NodeInfo + PartialEq + Sized {
         let data = self.get_style_data().unwrap().borrow();
         data.per_pseudo
             .get(&PseudoElement::Selection)
-            .unwrap_or(data.style.as_ref().unwrap()).clone()
+            .unwrap_or(data.style.as_ref().unwrap()).0.clone()
     }
 
     /// Removes the style from this node.

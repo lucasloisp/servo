@@ -36,6 +36,7 @@ use parking_lot::RwLock;
 use parser::ParserContextExtraData;
 use properties::{ComputedValues, parse_style_attribute};
 use properties::PropertyDeclarationBlock;
+use rule_tree::StrongRuleNode;
 use selector_impl::ElementExt;
 use selector_matching::ApplicableDeclarationBlock;
 use selectors::Element;
@@ -151,7 +152,7 @@ impl<'ln> GeckoNode<'ln> {
     }
 
     pub fn get_pseudo_style(&self, pseudo: &PseudoElement) -> Option<Arc<ComputedValues>> {
-        self.borrow_data().and_then(|data| data.per_pseudo.get(pseudo).map(|c| c.clone()))
+        self.borrow_data().and_then(|data| data.per_pseudo.get(pseudo).map(|c| c.0.clone()))
     }
 
     #[inline(always)]
@@ -334,10 +335,14 @@ impl<'ln> TNode for GeckoNode<'ln> {
     }
 
     fn get_existing_style(&self) -> Option<Arc<ComputedValues>> {
+        self.borrow_data().and_then(|x| x.style.as_ref().map(|s| s.0.clone()))
+    }
+
+    fn get_existing_style_and_rule_node(&self) -> Option<(Arc<ComputedValues>, StrongRuleNode)> {
         self.borrow_data().and_then(|x| x.style.clone())
     }
 
-    fn set_style(&self, style: Option<Arc<ComputedValues>>) {
+    fn set_style(&self, style: Option<(Arc<ComputedValues>, StrongRuleNode)>) {
         self.mutate_data().unwrap().style = style;
     }
 

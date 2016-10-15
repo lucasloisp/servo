@@ -65,6 +65,7 @@ use style::dom::{LayoutIterator, NodeInfo, OpaqueNode, PresentationalHintsSynthe
 use style::dom::UnsafeNode;
 use style::element_state::*;
 use style::properties::{ComputedValues, PropertyDeclarationBlock};
+use style::rule_tree::StrongRuleNode;
 use style::selector_impl::{ElementSnapshot, NonTSPseudoClass, PseudoElement, ServoSelectorImpl};
 use style::selector_matching::ApplicableDeclarationBlock;
 use style::sink::Push;
@@ -243,10 +244,14 @@ impl<'ln> TNode for ServoLayoutNode<'ln> {
     }
 
     fn get_existing_style(&self) -> Option<Arc<ComputedValues>> {
+        self.borrow_data().and_then(|x| x.style.as_ref().map(|s| s.0.clone()))
+    }
+
+    fn get_existing_style_and_rule_node(&self) -> Option<(Arc<ComputedValues>, StrongRuleNode)> {
         self.borrow_data().and_then(|x| x.style.clone())
     }
 
-    fn set_style(&self, style: Option<Arc<ComputedValues>>) {
+    fn set_style(&self, style: Option<(Arc<ComputedValues>, StrongRuleNode)>) {
         self.mutate_data().unwrap().style = style;
     }
 
